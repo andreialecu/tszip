@@ -8,5 +8,15 @@
     "@tsconfig/node10": "^1.0.0",
     "@tsconfig/node14": "^1.0.0",
     "@types/node": "^14.14.7"
+  },
+  "scripts": {
+    "prepack": "tsc -b ."
+  },
+  "files": [
+    "lib"
+  ],
+  "publishConfig": {
+    "main": "lib/index.js",
+    "types": "lib/indes.d.ts"
   }
 }

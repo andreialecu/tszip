@@ -1,4 +1,9 @@
 import { ZipConstants } from "./constants";
+import zlib from "zlib";
+import fs from "fs";
+import { promisify } from "util";
+const readPromise = promisify(fs.read);
+const inflateRawPromise = promisify(zlib.inflateRaw);
 
 export class ZipEntry {
   /** Full relative path */
@@ -23,10 +28,10 @@ export class ZipEntry {
   crc!: number;
 
   /** Compressed size */
-  compressedSize!: number | bigint;
+  compressedSize!: number;
 
   /** Uncompressed size */
-  size!: number | bigint;
+  size!: number;
 
   /** Filename length */
   fnameLen!: number;
@@ -47,12 +52,13 @@ export class ZipEntry {
   attr!: number;
 
   /** LOC header offset */
-  offset!: number | bigint;
+  offset!: number;
 
   isDirectory!: boolean;
   comment!: string | null;
 
-  headerOffset?: number;
+  headerOffset!: number;
+  dataOffset!: number;
 
   readHeader(data: Buffer, offset: number) {
     // data should be 46 bytes and start with "PK 01 02"
@@ -147,22 +153,23 @@ export class ZipEntry {
 
   parseZip64Extra(data: Buffer, offset: number, length: number) {
     if (length >= 8 && this.size === ZipConstants.EF_ZIP64_OR_32) {
-      this.size = data.readBigUInt64LE(offset);
+      this.size = Number(data.readBigUInt64LE(offset));
       offset += 8;
       length -= 8;
     }
     if (length >= 8 && this.compressedSize === ZipConstants.EF_ZIP64_OR_32) {
-      this.compressedSize = data.readBigUInt64LE(offset);
+      this.compressedSize = Number(data.readBigUInt64LE(offset));
       offset += 8;
       length -= 8;
     }
     if (length >= 8 && this.offset === ZipConstants.EF_ZIP64_OR_32) {
-      this.offset = data.readBigUInt64LE(offset);
+      this.offset = Number(data.readBigUInt64LE(offset));
       offset += 8;
       length -= 8;
     }
     if (length >= 4 && this.diskStart === ZipConstants.EF_ZIP64_OR_16) {
       this.diskStart = data.readUInt32LE(offset);
+      // not needed, because the function exits after this
       // offset += 4; length -= 4;
     }
   }
@@ -175,6 +182,38 @@ export class ZipEntry {
 
   get isFile() {
     return !this.isDirectory;
+  }
+
+  /**
+   * Decompresses the zip entry, from the given file descriptor
+   * @param zipFileDescriptor a file descriptor of the zip file
+   */
+  inflateSync(zipFileDescriptor: number) {
+    const data = Buffer.alloc(this.compressedSize);
+    fs.readSync(
+      zipFileDescriptor,
+      data,
+      0,
+      this.compressedSize,
+      this.offset + ZipConstants.LOCHDR + this.fnameLen + this.extraLen
+    );
+    return zlib.inflateRawSync(data);
+  }
+
+  /**
+   * Decompresses the zip entry, from the given file descriptor
+   * @param zipFileDescriptor a file descriptor of the zip file
+   */
+  async inflate(zipFileDescriptor: number) {
+    const data = Buffer.alloc(this.compressedSize);
+    await readPromise(
+      zipFileDescriptor,
+      data,
+      0,
+      this.compressedSize,
+      this.offset + ZipConstants.LOCHDR + this.fnameLen + this.extraLen
+    );
+    return inflateRawPromise(data);
   }
 }
 
