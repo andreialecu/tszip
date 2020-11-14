@@ -1,0 +1,7 @@
+{
+  "compilerOptions": {
+    "outDir": "lib",
+    "sourceMap": true
+  },
+  "extends": "@tsconfig/node10/tsconfig.json"
+}

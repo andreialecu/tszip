@@ -1,0 +1,10 @@
+{
+  "name": "tszip",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "dependencies": {
+    "typescript": "^4.0.5"
+  }
+}
